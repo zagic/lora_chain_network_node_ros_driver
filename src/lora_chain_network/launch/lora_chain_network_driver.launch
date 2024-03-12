@@ -1,0 +1,5 @@
+<launch>
+  <node name="lorachaindriver" pkg="driver_lora_chain_network" type="lora_chain_network_driver_node" />
+  <param name = "device_name" value="/dev/ttyUSB1" type="string" />
+
+</launch>
