@@ -43,9 +43,10 @@ target_include_directories(lora_chain_network_driver_node
         PRIVATE
         ${catkin_INCLUDE_DIRS})
 
-target_link_libraries(lora_chain_network_driver_node 
-        PRIVATE 
-        lora_chain_network_driver_lib ${catkin_LIBRARIES})
+add_executable(test_client src/test_client.cpp)
+target_include_directories(test_client
+        PRIVATE
+        ${catkin_INCLUDE_DIRS})
 
 
 
