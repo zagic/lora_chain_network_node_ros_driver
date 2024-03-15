@@ -29,12 +29,9 @@ static constexpr std::string AT_RETURN_RES_UNKNOWN  =     "UNKNOWN";
 static constexpr std::string AT_RETURN_RES_FORMAT_ERR  =  "COMMAND_FORMAT_ERROR";
 
 
-
-
-enum class BaudRate { // defined as bit-rate in datasheet
-  BAUD_115200
-};
-
+static constexpr std::string AT_RESPONSE_RES              =             "+RES=";
+static constexpr std::string AT_RESPONSE_STATUS           =             "+STATUS=";
+static constexpr std::string AT_RESPONSE_RECEIVE          =             "+RECEIVE=";
 
 
 } // namespace lora_chain_network_const

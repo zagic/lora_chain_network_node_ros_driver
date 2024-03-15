@@ -1,337 +1,214 @@
 #include "driver_lora_chain_network.h"
-#include "serial_unix.h"
+#include <serial/serial.h>
 #include "ros/ros.h"
 #include "sensor_msgs/Imu.h"
 #include "std_srvs/Trigger.h"
 #include "std_srvs/Empty.h"
 #include "iostream"
+#include <algorithm> 
+#include <chrono>
+
+serial::Serial ser_;
+
+
+ros::Publisher loraDataPublisher;
+ros::ServiceServer loraCommandService;
+
+/* variables to achieve asynchronized lora command TX pocess*/
+enum class taskStatus{
+  IDLE,
+  SENDING,
+  RETURNING,
+}
+volatile taskStatus taskTX = taskStatus::IDLE;
+volatile std:: string commandTosend ="";
+volatile int commandType = -1;
+volatile int commandResult = -1;
+volatile std:: string returnedInfo ="";
 
 
 
-bool calibration_mode{false};
-constexpr int NUMBER_OF_CALIBRATION_SAMPLES{100};
-constexpr double ACC_TOLERANCE{0.1};
-constexpr double MAX_DROPPED_ACC_X_MSG{5};
-constexpr double MAX_DROPPED_ACC_Y_MSG{5};
-constexpr double MAX_DROPPED_ACC_Z_MSG{5};
-constexpr double MAX_DROPPED_GYRO_X_MSG{5};
-constexpr double MAX_DROPPED_GYRO_Y_MSG{5};
-constexpr double MAX_DROPPED_GYRO_Z_MSG{5};
-constexpr double GYRO_X_PEAK_TO_PEAK_NOISE{0.0002};
-constexpr double GYRO_Y_PEAK_TO_PEAK_NOISE{0.0002};
-constexpr double GYRO_Z_PEAK_TO_PEAK_NOISE{0.0002};
+LoraReturnedStatus sendCommand(char * data,size_t len){
+    ser_.write(data,size_t len);
+}
 
+void emptyRxBuffer(){
+  while(ser_.available()){
+  }
+}
 
-
-
-
-
-bool responseCalibrateIMU(std_srvs::Trigger::Request &calibration_request, std_srvs::Trigger::Response &calibration_response)
-{
-
-    if (calibration_mode == false)
-    {
-        calibration_mode = true;
-        calibration_response.message = "IMU in calibration mode ";
-        calibration_response.success = true;
+bool handle_service_request(driver_lora_chain_network::loraService::Request &req,
+                            driver_lora_chain_network::loraService::Response &res) {
+    if(taskTX !=taskStatus::IDLE){ /*when task is not free*/
+      res.command=static_cast<uint8_t>(LoraReturnedStatus::RES_BUZY);
+      return true;
     }
+    ROS_INFO("Request received: %s", req.command.c_str());
+    commandTosend = req.command;
+    taskTX = taskStatus::SENDING;
+    while(taskTX != taskStatus::RETURNING){
+      ros::Duration(0.01).sleep();
+    }
+
+    res.result = commandResult; 
+    res.commandtype = commandType; 
+    res.response_message = returnedInfo;
     
     return true;
 }
 
+void broadcastToTopic(std::string msg){
+  ReceivedMesssageObj_t tr;
+  tr.len =0;
+  std::istringstream iss(msg);
+  std::string token,id,repeater_id,qos,data;
+  if(std::getline(iss, token, ' ')){   /*There is a space after +receive= */
+    if(std::getline(iss, id, ',')){  
+        if(std::getline(iss, repeater_id, ',')){  
+          if(std::getline(iss, qos, ',')){  
+            if(std::getline(iss, data, ' ')){  
+              std::vector<uint8_t> id_vector = fromHexString(id,DEVICE_ID_LEN,0);
+              if(id_vector.size()==DEVICE_ID_LEN){
+                  for(int i =0;i<DEVICE_ID_LEN;i++){
+                      tr.Source[i] = id_vector[i];
+                  }
+              }else{
+                  break;
+              }
+
+              std::vector<uint8_t> data_vector = fromHexString(data,data.size()/2,0);
+              if(data_vector.size() ==data.size()/2){
+                tr.len = std:min(data_vector.size(),MAX_MESSAGE_PAYLOAD_LEN);
+                memcpy(tr.payload,data_vector.data(),tr.len);
+              }else{
+                break;
+              }
+
+              std::vector<uint8_t> qos_vector = fromHexString(qos,1,0);
+              uint8_t qos_u8 =  qos_vector& 0xF0;
+              tr.MessageType = static_cast<MessageType>(qos_u8);
+              loraDataPublisher.publish(tr);
+              return;
+
+            }
+          }
+        }
+    }
+  }
+  ROS_WARN("Lora message parse failed");
+  return;
+}
+
+/* some command expect two +res=OK and some just need one, 
+ chanInfo require another +res which contains the channel info */
+LoraReturnedStatus waitRes(int res_num,int expire_time){
+  int num_counter = 0;
+  std::string line;
+  std::chrono::seconds timeout(expire_time); 
+  auto start = std::chrono::steady_clock::now(); 
+
+  while(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - start) < timeout) {
+
+      if(ser_.available()){
+        
+        line = ser_.readline(100+ MAX_MESSAGE_PAYLOAD_LEN*2, "\n");
+        ROS_INFO("UART received: %s", line.c_str());
+        if(line.find(AT_RESPONSE_RES) != std::string::npos){
+          if(line.find(AT_RETURN_RES_OK) != std::string::npos){
+            num_counter++;
+            if(num_counter ==res_num){
+              commandResult = static_cast<int>(LoraReturnedStatus::RES_OK);
+              return commandResult;
+            }
+          }else if(line.find(AT_RETURN_RES_BUZY) != std::string::npos){
+              commandResult = static_cast<int>(LoraReturnedStatus::RES_BUZY);
+              return commandResult;
+          }else if(line.find(AT_RETURN_RES_ERROR) != std::string::npos){
+              commandResult = static_cast<int>(LoraReturnedStatus::RES_ERROR);
+              return commandResult;
+          }else if(line.find(AT_RETURN_RES_TIMEOUT) != std::string::npos){
+              commandResult = static_cast<int>(LoraReturnedStatus::RES_TIMEOUT);
+              return commandResult;
+          }else if(line.find(AT_RETURN_RES_FORMAT_ERR) != std::string::npos){
+              commandResult = static_cast<int>(LoraReturnedStatus::RES_COMMAND_FORMAT_ERROR);
+              return commandResult;
+          }else if(line.find(",") != std::string::npos){
+              returnedInfo =line;
+              num_counter++;
+              if(num_counter ==res_num){
+                commandResult = static_cast<int>(LoraReturnedStatus::RES_OK);
+                return commandResult;
+              }
+          }else{
+              commandResult = static_cast<int>(LoraReturnedStatus::RES_UNKNOWN);
+              return commandResult;
+          }
+        }else if(line.find(AT_RESPONSE_STATUS) != std::string::npos){
+            returnedInfo =line;
+        }else if(line.find(AT_RESPONSE_RECEIVE) != std::string::npos){
+            broadcastToTopic(line);
+        }else{
+
+        }
+      }
+
+  }
+}
 
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "lora_chain_network_driver_node");
-
   ros::NodeHandle node;
-
   std::string device_name;
   std::string topic_name;
-  std::string frame_id;
-  double variance_gyro{0};
-  double variance_acc{0};
-  int sample_rate{0};
-  double gravity{0};
-
-  int imu_defreq_counter=0;
-
-
+  std::string service_name;
   node.param<std::string>("device_name", device_name, "/dev/ttyUSB0");
-  node.param<std::string>("topic_name", topic_name, "imu/data");
-  node.param<std::string>("frame_id", frame_id, "imu_link");
+  node.param<std::string>("topic_name", topic_name, "lora/received_msg");
+  node.param<std::string>("service_name", service_name, "lora/service");
 
-  node.param("variance_gyro", variance_gyro,0.0001*2*4.6*pow(10,-4));
-  node.param("variance_acc", variance_acc, 0.000055); 
-  node.param("sample_rate", sample_rate, 500);
 
-  node.param("gravity", gravity, 9.80665);
+  loraDataPublisher = node.advertise<ReceivedMesssageObj_t>(topic_name, 1000);
+  loraCommandService = node.advertiseService(service_name,handle_service_request);
 
-  // These values have been estimated by having beluga in a pool for a couple of minutes, and then calculate the variance for each values
-  sensor_msgs::Imu stim300msg{};
-  stim300msg.angular_velocity_covariance[0] = 0.0000027474;
-  stim300msg.angular_velocity_covariance[4] = 0.0000027474;
-  stim300msg.angular_velocity_covariance[8] = 0.000007312;
-  stim300msg.linear_acceleration_covariance[0] = 0.00041915;
-  stim300msg.linear_acceleration_covariance[4] = 0.00041915;
-  stim300msg.linear_acceleration_covariance[8] = 0.000018995;
-  stim300msg.orientation.x = 0.00000024358;
-  stim300msg.orientation.y = 0.00000024358;
-  stim300msg.orientation.z = 0.00000024358;
-  stim300msg.header.frame_id = frame_id;
+
+  //ros::Rate loop_rate(2);
 
 
 
+  try{
+      // 打开串口
+      ser_.setPort(device_name);
+      ser_.setBaudrate(SERIAL_BAUDRATE);
+      serial::Timeout to = serial::Timeout::simpleTimeout(1000);
+      ser_.setTimeout(to);
+      ser_.open();
 
-  ros::Publisher imuSensorPublisher = node.advertise<sensor_msgs::Imu>(topic_name, 1000);
-  //ros::Publisher orientationPublisher = node.advertise<sensor_msgs::Imu>("imu/orientation", 1000);
-  ros::ServiceServer service = node.advertiseService("IMU_calibration",responseCalibrateIMU);
-
-  // New messages are sent from the sensor with sample_rate
-  // As loop_rate determines how often we check for new data
-  // on the serial buffer, theoretically loop_rate = sample_rate
-  // should be okey, but to be sure we double it
-  ros::Rate loop_rate(sample_rate * 2);
-
-  try {
-    SerialUnix serial_driver(device_name, stim_const::BaudRate::BAUD_921600);
-    DriverStim300 driver_stim300(serial_driver);
-
-    ROS_INFO("STIM300 IMU driver initialized successfully");
-
-    int difference_in_dataGram{0};
-    int count_messages{0};
-    int number_of_samples{0};
-    double inclination_x{0};
-    double inclination_y{0};
-    double inclination_z{0};
-
-    double average_calibration_roll{0};
-    double average_calibration_pitch{0};
-    double inclination_x_calibration_sum{0};
-    double inclination_y_calibration_sum{0};
-    double inclination_z_calibration_sum{0};
-    double inclination_x_average{0};
-    double inclination_y_average{0};
-    double inclination_z_average{0};
-
-    // Acc wild point filter
-    std::vector<double> acceleration_buffer_x{};
-    std::vector<double> acceleration_buffer_y{};
-    std::vector<double> acceleration_buffer_z{};
-    double dropped_acceleration_x_msg{0.0};
-    double dropped_acceleration_y_msg{0.0};
-    double dropped_acceleration_z_msg{0.0};
-
-    // Gyro wild point filter
-    std::vector<double> gyro_buffer_x{};
-    std::vector<double> gyro_buffer_y{};
-    std::vector<double> gyro_buffer_z{};
-    double dropped_gyro_x_msg{0.0};
-    double dropped_gyro_y_msg{0.0};
-    double dropped_gyro_z_msg{0.0};
-
-  
-    ROS_WARN("%s", driver_stim300.printSensorConfig().c_str());
-
-    while (ros::ok())
-    {
-      switch (driver_stim300.update())
-      {
-        case Stim300Status::NORMAL:
-          break;
-        case Stim300Status::OUTSIDE_OPERATING_CONDITIONS:
-          ROS_DEBUG("Stim 300 outside operating conditions");
-          break;
-        case Stim300Status::NEW_MEASURMENT:
-              inclination_x = driver_stim300.getIncX();
-              inclination_y = driver_stim300.getIncY();
-              inclination_z = driver_stim300.getIncZ();
-
-           if (calibration_mode == true)
-            {
-              //std::cout<<"in calibration_mode"<<std::endl;
-                if(number_of_samples < NUMBER_OF_CALIBRATION_SAMPLES)
-                {
-                    std::cout<<"in calibration_mode"<<std::endl;
-                    number_of_samples++;
-                    //std::cout<<number_of_samples<<std::endl;
-                    inclination_x_calibration_sum += inclination_x;
-                    inclination_y_calibration_sum += inclination_y;
-                    inclination_z_calibration_sum += inclination_z;
-
-                }
-                else
-                {
-                    //std::cout<<"in else"<<std::endl;
-                    inclination_x_average = inclination_x_calibration_sum/NUMBER_OF_CALIBRATION_SAMPLES;
-                    inclination_y_average = inclination_y_calibration_sum/NUMBER_OF_CALIBRATION_SAMPLES;
-                    inclination_z_average = inclination_z_calibration_sum/NUMBER_OF_CALIBRATION_SAMPLES;
-
-                    average_calibration_roll = atan2(inclination_y_average,inclination_z_average);
-                    average_calibration_pitch = atan2(-inclination_x_average,sqrt(pow(inclination_y_average,2)+pow(inclination_z_average,2)));
-                    std::cout<<average_calibration_roll<<std::endl;
-                    std::cout<<average_calibration_pitch<<std::endl;
-                    ROS_INFO("roll: %f", average_calibration_roll);
-                    ROS_INFO("pitch: %f", average_calibration_pitch);
-                    ROS_INFO("IMU Calibrated");
-                    calibration_mode = false;
-                }
-              break;  
-            }
-            else
-            {
-
-
-                    // Acceleration wild point filter
-
-                    // Previous message
-                    acceleration_buffer_x.push_back(driver_stim300.getAccX() * gravity);
-                    acceleration_buffer_y.push_back(driver_stim300.getAccY() * gravity);
-                    acceleration_buffer_z.push_back(driver_stim300.getAccZ() * gravity);
-                    stim300msg.header.stamp = ros::Time::now();
-
-                    if (false && acceleration_buffer_x.size() == 2 && acceleration_buffer_y.size() == 2 && acceleration_buffer_z.size() == 2)
-                    {
-                      if(std::abs(acceleration_buffer_x.back() - acceleration_buffer_x.front()) < ACC_TOLERANCE || dropped_acceleration_x_msg > MAX_DROPPED_ACC_X_MSG )
-                      {
-                        stim300msg.linear_acceleration.x = acceleration_buffer_x.back();
-                        dropped_acceleration_x_msg = 0;
-                      }
-                      else
-                      {
-                        ROS_DEBUG("ACC_X_MSG wild point rejected");
-                        dropped_acceleration_x_msg +=1;
-                      }
-
-                      if(std::abs(acceleration_buffer_y.back() - acceleration_buffer_y.front()) < ACC_TOLERANCE || dropped_acceleration_y_msg > MAX_DROPPED_ACC_Y_MSG )
-                      {
-                        stim300msg.linear_acceleration.y = acceleration_buffer_y.back();
-                        dropped_acceleration_y_msg = 0;
-                      }
-                      else
-                      {
-                        ROS_DEBUG("ACC_Y_MSG wild point rejected");
-                        dropped_acceleration_y_msg +=1;
-                      }
-
-                      if(std::abs(acceleration_buffer_z.back() - acceleration_buffer_z.front()) < ACC_TOLERANCE || dropped_acceleration_z_msg > MAX_DROPPED_ACC_Z_MSG )
-                      {
-                        stim300msg.linear_acceleration.z = acceleration_buffer_z.back();
-                        dropped_acceleration_z_msg = 0;
-                      }
-                      else
-                      {
-                        ROS_DEBUG("ACC_Z_MSG wild point rejected");
-                        dropped_acceleration_z_msg +=1;
-                      }
-                      // Empty acceleration buffers
-                      acceleration_buffer_x = std::vector<double>{acceleration_buffer_x.back()};
-                      acceleration_buffer_y = std::vector<double>{acceleration_buffer_y.back()};
-                      acceleration_buffer_z = std::vector<double>{acceleration_buffer_z.back()};
-                      ROS_WARN("here1");
-                    }
-                    else
-                    {
-                      stim300msg.linear_acceleration.x = driver_stim300.getAccX() * gravity ;
-                      stim300msg.linear_acceleration.y = driver_stim300.getAccY() * gravity ;
-                      stim300msg.linear_acceleration.z = driver_stim300.getAccZ() * gravity ;
-                    }
-
-                    // Gyro wild point filter
-                    gyro_buffer_x.push_back(driver_stim300.getGyroX());
-                    gyro_buffer_y.push_back(driver_stim300.getGyroY());
-                    gyro_buffer_z.push_back(driver_stim300.getGyroZ());
-                    if(imu_defreq_counter%500==0){
-                      
-                      // ROS_DEBUG("gyro x: %f, y: %f, z: %f",driver_stim300.getGyroX(),driver_stim300.getGyroY(),driver_stim300.getGyroZ());
-                      // ROS_WARN("acc x: %f, y: %f, z: %f",driver_stim300.getAccX(),driver_stim300.getAccY(),driver_stim300.getAccZ());
-                    
-                    }
-                    imu_defreq_counter++;
-                    if(false && gyro_buffer_x.size() == 2 && gyro_buffer_y.size() == 2 && gyro_buffer_z.size() == 2)
-                    {
-
-                      if(std::abs(gyro_buffer_x.back() - gyro_buffer_x.front()) < std::max(2*std::abs(gyro_buffer_x.front()),GYRO_X_PEAK_TO_PEAK_NOISE) || dropped_gyro_x_msg > MAX_DROPPED_GYRO_X_MSG)
-                      {
-                        stim300msg.angular_velocity.x = gyro_buffer_x.back();
-                        dropped_gyro_x_msg = 0;
-                      }
-                      else
-                      {
-                        ROS_DEBUG("GYRO_X_MSG wild point rejected");
-                        dropped_gyro_x_msg += 1;
-                      }
-
-                      if(std::abs(gyro_buffer_y.back() - gyro_buffer_y.front()) < std::max(2*std::abs(gyro_buffer_y.front()),GYRO_Y_PEAK_TO_PEAK_NOISE) || dropped_gyro_y_msg > MAX_DROPPED_GYRO_Y_MSG)
-                      {
-                        stim300msg.angular_velocity.x = gyro_buffer_y.back();
-                        dropped_gyro_y_msg = 0;
-                      }
-                      else
-                      {
-                        ROS_DEBUG("GYRO_Y_MSG wild point rejected");
-                        dropped_gyro_y_msg += 1;
-                      }
-
-                      if(std::abs(gyro_buffer_z.back() - gyro_buffer_z.front()) < std::max(2*std::abs(gyro_buffer_z.front()),GYRO_Z_PEAK_TO_PEAK_NOISE) || dropped_gyro_z_msg > MAX_DROPPED_GYRO_Z_MSG)
-                      {
-                        stim300msg.angular_velocity.z = gyro_buffer_z.back();
-                        dropped_gyro_z_msg = 0;
-                      }
-                      else
-                      {
-                        ROS_DEBUG("GYRO_Z_MSG wild point rejected");
-                        dropped_gyro_z_msg += 1;
-                      }
-
-                      // Empty buffers
-                      gyro_buffer_x = std::vector<double>{gyro_buffer_x.back()};
-                      gyro_buffer_y = std::vector<double>{gyro_buffer_y.back()};
-                      gyro_buffer_z = std::vector<double>{gyro_buffer_z.back()};
-                      ROS_WARN("here");
-                    }
-                    else
-                    {
-                      stim300msg.angular_velocity.x = driver_stim300.getGyroX();
-                      stim300msg.angular_velocity.y = driver_stim300.getGyroY();
-                      stim300msg.angular_velocity.z = driver_stim300.getGyroZ();
-                    }
-
-
-
-                    imuSensorPublisher.publish(stim300msg);
-                    break;
-            }
-        case Stim300Status::CONFIG_CHANGED:
-          ROS_INFO("Updated Stim 300 imu config: ");
-          ROS_INFO("%s", driver_stim300.printSensorConfig().c_str());
-          loop_rate = driver_stim300.getSampleRate()*2;
-          break;
-        case Stim300Status::STARTING_SENSOR:
-          ROS_INFO("Stim 300 IMU is warming up.");
-          break;
-        case Stim300Status::SYSTEM_INTEGRITY_ERROR:
-          ROS_WARN("Stim 300 IMU system integrity error.");
-          break;
-        case Stim300Status::OVERLOAD:
-          ROS_WARN("Stim 300 IMU overload.");
-          break;
-        case Stim300Status::ERROR_IN_MEASUREMENT_CHANNEL:
-          ROS_WARN("Stim 300 IMU error in measurement channel.");
-          break;
-        case Stim300Status::ERROR:
-          ROS_WARN("Stim 300 IMU: internal error.");
-
-      }
-
-      loop_rate.sleep();
-      ros::spinOnce();
-    }
-    return 0;
-  } catch (std::runtime_error &error) {
+      
+  }
+  catch (serial::IOException& e){
+      ROS_ERROR_STREAM("Unable to open port ");
+      return -1;
+  }catch (std::runtime_error &error) {
     // TODO: Reset IMU
     ROS_ERROR("%s\n", error.what());
     return 0;
   }
+
+  while (ros::ok())
+  {
+    ros::spinOnce();
+    if(taskTX == taskStatus::RETURNING){
+      if(commandTosend.find(AT_CMD_RESET) != std::string::npos){
+        commandType = static_cast<int>(LoraCommandType::RESET);
+
+      }
+    }
+    
+    if(ser_.available()){
+    }
+  }
+  return 0;
+  
+
+  
 }
