@@ -50,17 +50,17 @@ struct ChanInfoObj_t {
   uint8_t idx;
   int8_t snr;
   int16_t rss;
-}
+};
 
 struct ChanInfoList_t{
   ChanInfoObj_t list[MAX_CHAN_INFO_LEN];
   uint8_t len;
-}
+};
 
 enum class MessageType{
   DATA_TRAFFIC,
   ACKNOWLEDGEMENT
-}
+};
 static constexpr uint8_t MAX_MESSAGE_PAYLOAD_LEN = 200;
 
 struct ReceivedMesssageObj_t {
@@ -68,24 +68,24 @@ struct ReceivedMesssageObj_t {
   uint8_t payload[MAX_MESSAGE_PAYLOAD_LEN];
   MessageType type;
   uint16_t len;
-}
+};
 
 struct CommandResult_t{
-    LoraCommandType cmd,
-    LoraReturnedStatu status,
+    LoraCommandType cmd;
+    LoraReturnedStatus status;
     union{
         uint16_t session_id;
         ChanInfoList_t chanInfoList;
         LoraNodeStatus node_status;
-    }data
-}
+    }data;
+};
 
-std::string formSetIDCommand(uint8_t * id) const noexcept;
-std::string formSoftResetCommand() const noexcept;
-std::string formJoinCommand() const noexcept;
-std::string formStatusCheckCommand()(LoraNodeStatus * status) const noexcept;
-std::string formSendCommand(uint8_t * target, QosLevel qos, uint8_t * payload, int len) const noexcept;
-std::string formChanInfoCommand() const noexcept;
+std::string formSetIDCommand(uint8_t * id) ;
+std::string formSoftResetCommand() ;
+std::string formJoinCommand() ;
+std::string formStatusCheckCommand() ;
+std::string formSendCommand(uint8_t * target, QosLevel qos, uint8_t * payload, int len) ;
+std::string formChanInfoCommand() ;
 
 CommandResult_t parseCommandResult(int command, int res, std::string response);
 

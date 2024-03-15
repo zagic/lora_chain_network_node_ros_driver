@@ -4,20 +4,13 @@ project(driver_lora_chain_network)
 set(CMAKE_CXX_STANDARD 14)
 
 
-target_include_directories(lora_chain_network_driver_lib
-        PUBLIC
-        $<INSTALL_INTERFACE:include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        )
-target_link_libraries(lora_chain_network_driver_lib)
 
 find_package(catkin REQUIRED COMPONENTS
         roscpp
         sensor_msgs
 	std_srvs
         message_generation
+        serial 
         )
 
 add_service_files(

@@ -1,4 +1,5 @@
-#include "driver_lora_chain_network.h"
+#include "../include/lora_msg_parser_generator.h"
+#include "driver_lora_chain_network/loraService.h"
 #include <serial/serial.h>
 #include "ros/ros.h"
 #include "sensor_msgs/Imu.h"
@@ -19,18 +20,17 @@ enum class taskStatus{
   IDLE,
   SENDING,
   RETURNING,
-}
+};
+
 volatile taskStatus taskTX = taskStatus::IDLE;
-volatile std:: string commandTosend ="";
+std:: string commandTosend ="";
 volatile int commandType = -1;
 volatile int commandResult = -1;
-volatile std:: string returnedInfo ="";
+std:: string returnedInfo ="";
+
+constexpr int SERIAL_BAUDRATE =115200;
 
 
-
-LoraReturnedStatus sendCommand(char * data,size_t len){
-    ser_.write(data,size_t len);
-}
 
 void emptyRxBuffer(){
   while(ser_.available()){

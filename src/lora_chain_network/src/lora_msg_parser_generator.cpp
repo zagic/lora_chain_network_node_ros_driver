@@ -1,5 +1,5 @@
 #include "lora_msg_parser_generator.h"
-
+#include "driver_lora_chain_network/loraService.h"
 #include <sstream>
 #include <iomanip>
 
@@ -39,8 +39,8 @@ std::vector<uint8_t> fromHexString(const std::string& hexStr, size_t bytelen, si
  * @param id the two-bytes-long ID 
  * @return Generated command string
  */
-std::string formSetIDCommand(uint8_t * id) const noexcept{
-  return AT_CMD_SET_ID + toHexString(id, DEVICE_ID_LEN) +",0000" +"/r/n";
+std::string formSetIDCommand(uint8_t * id) {
+  return AT_CMD_SET_ID + toHexString(id, DEVICE_ID_LEN) +",0000" +"\r\n";
 }
 
 
@@ -48,8 +48,8 @@ std::string formSetIDCommand(uint8_t * id) const noexcept{
  * @brief Soft reset command
  * @return Generated command string
  */
-std::string formSoftResetCommand() const noexcept{
-    return AT_CMD_RESET+"/r/n";
+std::string formSoftResetCommand() {
+    return AT_CMD_RESET+"\r\n";
 }
 
 
@@ -57,16 +57,16 @@ std::string formSoftResetCommand() const noexcept{
  * @brief Join netwokr command
  * @return Generated command string
  */
-std::string formJoinCommand() const noexcept{
-    return AT_CMD_JOIN+"/r/n";
+std::string formJoinCommand() {
+    return AT_CMD_JOIN+"\r\n";
 }
 
 /**
  * @brief status check command
  * @return Generated command string
  */
-std::string formStatusCheckCommand()(LoraNodeStatus * status) const noexcept{
-    return AT_CMD_STATUS+"?/r/n";
+std::string formStatusCheckCommand() {
+    return AT_CMD_STATUS+"?\r\n";
 }
 
 /**
@@ -78,17 +78,17 @@ std::string formStatusCheckCommand()(LoraNodeStatus * status) const noexcept{
  * @param len     payload length
  * @return Generated command string
  */
-std::string formSendCommand(uint8_t * target, QosLevel qos, uint8_t * payload, int len) const noexcept{
+std::string formSendCommand(uint8_t * target, QosLevel qos, uint8_t * payload, int len) {
     return AT_CMD_SEND + toHexString(target, DEVICE_ID_LEN) + ","+ toHexString(static_cast<uint8_t>(qos), 1)
-    +",0,"+toHexString(payload, len)+"/r/n";
+    +",0,"+toHexString(payload, len)+"\r\n";
 }
 
 /**
  * @brief request channel info command
  * @return Generated command string
  */
-std::string formChanInfoCommand() const noexcept{
-    return AT_CMD_CHANINFO+"=0/r/n";
+std::string formChanInfoCommand() {
+    return AT_CMD_CHANINFO+"=0\r\n";
 }
 
 

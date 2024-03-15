@@ -1,10 +1,14 @@
-#include "driver_lora_chain_network.h"
+
 #include "ros/ros.h"
 #include "std_srvs/Trigger.h"
 #include "std_srvs/Empty.h"
 #include "iostream"
 #include <chrono>
-#include "lora_msg_parser_generator.h"
+#include "../include/lora_msg_parser_generator.h"
+
+void loraMessageCallback(const ReceivedMesssageObj_t* msg ){
+    ROS_INFO("Receive msg");
+}
 
 int main(int argc, char** argv)
 {
@@ -17,11 +21,11 @@ int main(int argc, char** argv)
   node.param<std::string>("service_name", service_name, "lora/service");
 
 
-  ros::Subscriber sub = nh.subscribe<ReceivedMesssageObj_t>(topic_name, 1, loraMessageCallback);
+  ros::Subscriber sub = node.subscribe<ReceivedMesssageObj_t>(topic_name, 1, loraMessageCallback);
   
 
   //ros::Rate loop_rate(2);
-  ros::ServiceClient client = n.serviceClient<driver_lora_chain_network::loraService>(service_name);
+  ros::ServiceClient client = node.serviceClient<driver_lora_chain_network::loraService>(service_name);
   
   std::this_thread::sleep_for(std::chrono::seconds(2));
 
@@ -50,8 +54,4 @@ int main(int argc, char** argv)
   
 }
 
-
-    return 0;
-
-    // 创建Subscriber，订阅指定topic的PointCloud2消息，指定回调函数
-    ros::Subscriber sub = nh.subscribe<sensor_msgs::PointCloud2>(topic_name, 1, pointCloudCallback);
+void imuCallback(const sensor_msgs::Imu::ConstPtr& imu_msg) 
