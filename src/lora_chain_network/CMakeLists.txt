@@ -7,11 +7,16 @@ set(CMAKE_CXX_STANDARD 14)
 
 find_package(catkin REQUIRED COMPONENTS
         roscpp
-        sensor_msgs
+        std_msgs
 	std_srvs
         message_generation
         serial 
         )
+
+add_library(lora_msg_parser_generator
+  src/lora_msg_parser_generator.cpp
+)
+
 
 add_service_files(
   FILES
@@ -23,23 +28,32 @@ generate_messages(
   std_msgs
 )
 
+target_link_libraries(lora_msg_parser_generator
+  ${catkin_LIBRARIES}
+
+)
+
 catkin_package(
+        INCLUDE_DIRS include
+        LIBRARIES lora_msg_parser_generator
         CATKIN_DEPENDS 
         roscpp 
         rospy
         message_runtime 
         std_srvs
+        std_msgs
+        serial
 )
 
-add_executable(lora_chain_network_driver_node src/lora_chain_network_driver_node.cpp)
-target_include_directories(lora_chain_network_driver_node
+add_executable(driver_lora_chain_network_node src/driver_lora_chain_network_node.cpp)
+target_include_directories(driver_lora_chain_network_node
         PRIVATE
-        ${catkin_INCLUDE_DIRS})
+        ${catkin_LIBRARIES})
 
-add_executable(test_client src/test_client.cpp)
-target_include_directories(test_client
+add_executable(lora_test_node src/test_client.cpp)
+target_include_directories(lora_test_node
         PRIVATE
-        ${catkin_INCLUDE_DIRS})
+        ${catkin_LIBRARIES})
 
 
 

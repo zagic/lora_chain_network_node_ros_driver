@@ -2,7 +2,8 @@
 #define LORA_MSG_PARSER_GENERATOR_H
 
 #include "lora_chain_network_constants.h"
-
+#include <vector>
+#include "std_msgs/String.h"
 
 enum class LoraCommandType {
     SET_ID,
@@ -88,6 +89,9 @@ std::string formSendCommand(uint8_t * target, QosLevel qos, uint8_t * payload, i
 std::string formChanInfoCommand() ;
 
 CommandResult_t parseCommandResult(int command, int res, std::string response);
+ReceivedMesssageObj_t parseReceivedMessage(std::string msg);
 
+std::vector<uint8_t> fromHexString(const std::string& hexStr, size_t bytelen, size_t startPos = 0 );
+std::string toHexString(const uint8_t* data, size_t length);
 
 #endif

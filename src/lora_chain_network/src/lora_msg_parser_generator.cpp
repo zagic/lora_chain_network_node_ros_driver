@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iomanip>
 
+
 std::string toHexString(const uint8_t* data, size_t length) {
     std::stringstream ss;
     ss << std::hex << std::setfill('0');
@@ -40,7 +41,7 @@ std::vector<uint8_t> fromHexString(const std::string& hexStr, size_t bytelen, si
  * @return Generated command string
  */
 std::string formSetIDCommand(uint8_t * id) {
-  return AT_CMD_SET_ID + toHexString(id, DEVICE_ID_LEN) +",0000" +"\r\n";
+  return lora_chain_network_const::AT_CMD_SET_ID + toHexString(id, DEVICE_ID_LEN) +",0000" +"\r\n";
 }
 
 
@@ -49,7 +50,7 @@ std::string formSetIDCommand(uint8_t * id) {
  * @return Generated command string
  */
 std::string formSoftResetCommand() {
-    return AT_CMD_RESET+"\r\n";
+    return lora_chain_network_const::AT_CMD_RESET+"\r\n";
 }
 
 
@@ -58,7 +59,7 @@ std::string formSoftResetCommand() {
  * @return Generated command string
  */
 std::string formJoinCommand() {
-    return AT_CMD_JOIN+"\r\n";
+    return lora_chain_network_const::AT_CMD_JOIN+"\r\n";
 }
 
 /**
@@ -66,7 +67,7 @@ std::string formJoinCommand() {
  * @return Generated command string
  */
 std::string formStatusCheckCommand() {
-    return AT_CMD_STATUS+"?\r\n";
+    return lora_chain_network_const::AT_CMD_STATUS+"?\r\n";
 }
 
 /**
@@ -131,7 +132,7 @@ CommandResult_t parseCommandResult(int command, int res, std::string response){
             return tr;
         case 3:
             tr.cmd = LoraCommandType::SEND;
-            if(response.find(AT_RESPONSE_STATUS) != std::string::npos){
+            if(response.find(lora_chain_network_const::AT_RESPONSE_STATUS) != std::string::npos){
                 std::string token,session_id;
                 if(std::getline(iss,token, ',')){
                     if(std::getline(iss,session_id, ',')){
@@ -149,7 +150,7 @@ CommandResult_t parseCommandResult(int command, int res, std::string response){
         case 4:
             tr.cmd = LoraCommandType::CHAN_INFO;
             uint8_t num =0;
-            if(response.find(AT_RESPONSE_RECEIVE) != std::string::npos){
+            if(response.find(lora_chain_network_const::AT_RESPONSE_RECEIVE) != std::string::npos){
                 std::istringstream iss(response);
                 std::string token,id,idx,rss,snr;
                 
@@ -210,4 +211,47 @@ CommandResult_t parseCommandResult(int command, int res, std::string response){
             return tr;
 
     }
+}
+
+ReceivedMesssageObj_t parseReceivedMessage(std::string msg){
+  ReceivedMesssageObj_t tr;
+  tr.len =0;
+  std::istringstream iss(msg);
+  std::string token,id,repeater_id,qos,data;
+  if(std::getline(iss, token, ' ')){   /*There is a space after +receive= */
+    if(std::getline(iss, id, ',')){  
+        if(std::getline(iss, repeater_id, ',')){  
+          if(std::getline(iss, qos, ',')){  
+            if(std::getline(iss, data, ' ')){  
+              std::vector<uint8_t> id_vector = fromHexString(id,DEVICE_ID_LEN,0);
+              if(id_vector.size()==DEVICE_ID_LEN){
+                  for(int i =0;i<DEVICE_ID_LEN;i++){
+                      tr.Source[i] = id_vector[i];
+                  }
+              }else{
+                  ROS_WARN("Lora message parse failed");
+                  return tr;
+              }
+
+              std::vector<uint8_t> data_vector = fromHexString(data,data.size()/2,0);
+              if(data_vector.size() ==data.size()/2){
+                tr.len = std::min(data_vector.size(),MAX_MESSAGE_PAYLOAD_LEN);
+                memcpy(tr.payload,data_vector.data(),tr.len);
+              }else{
+                ROS_WARN("Lora message parse failed");
+                return tr;
+              }
+
+              std::vector<uint8_t> qos_vector = fromHexString(qos,1,0);
+              uint8_t qos_u8 =  qos_vector[0] & 0xF0;
+              tr.MessageType = static_cast<MessageType>(qos_u8);
+              return tr;
+
+            }
+          }
+        }
+    }
+  }
+  ROS_WARN("Lora message parse failed");
+  return;
 }

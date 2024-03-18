@@ -2,12 +2,13 @@
 #include "ros/ros.h"
 #include "std_srvs/Trigger.h"
 #include "std_srvs/Empty.h"
-#include "iostream"
+#include <thread>
 #include <chrono>
 #include "../include/lora_msg_parser_generator.h"
 
-void loraMessageCallback(const ReceivedMesssageObj_t* msg ){
-    ROS_INFO("Receive msg");
+void loraMessageCallback(const std_msgs::String::ConstPtr& msg){
+    parseReceivedMessage(msg->data);
+    ROS_INFO("Receive msg: %s", msg->data.c_str());
 }
 
 int main(int argc, char** argv)
@@ -21,7 +22,7 @@ int main(int argc, char** argv)
   node.param<std::string>("service_name", service_name, "lora/service");
 
 
-  ros::Subscriber sub = node.subscribe<ReceivedMesssageObj_t>(topic_name, 1, loraMessageCallback);
+  ros::Subscriber sub = node.subscribe<std_msgs::String>(topic_name, 1, loraMessageCallback);
   
 
   //ros::Rate loop_rate(2);
@@ -53,5 +54,3 @@ int main(int argc, char** argv)
 
   
 }
-
-void imuCallback(const sensor_msgs::Imu::ConstPtr& imu_msg) 
