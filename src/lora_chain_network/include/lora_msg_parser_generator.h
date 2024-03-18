@@ -3,7 +3,7 @@
 
 #include "lora_chain_network_constants.h"
 #include <vector>
-#include "std_msgs/String.h"
+
 
 enum class LoraCommandType {
     SET_ID,
@@ -62,7 +62,7 @@ enum class MessageType{
   DATA_TRAFFIC,
   ACKNOWLEDGEMENT
 };
-static constexpr uint8_t MAX_MESSAGE_PAYLOAD_LEN = 200;
+static constexpr int MAX_MESSAGE_PAYLOAD_LEN = 200;
 
 struct ReceivedMesssageObj_t {
   uint8_t Source[DEVICE_ID_LEN];

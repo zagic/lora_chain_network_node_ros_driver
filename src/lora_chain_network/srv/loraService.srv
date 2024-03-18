@@ -1,7 +1,5 @@
-# request part
 string command
 ---
-# response part
 int32 commandtype
 int32 result
 string response_message

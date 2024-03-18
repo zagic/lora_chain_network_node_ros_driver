@@ -5,6 +5,8 @@
 #include <thread>
 #include <chrono>
 #include "../include/lora_msg_parser_generator.h"
+#include "std_msgs/String.h"
+#include "driver_lora_chain_network/loraService.h"
 
 void loraMessageCallback(const std_msgs::String::ConstPtr& msg){
     parseReceivedMessage(msg->data);
@@ -31,7 +33,7 @@ int main(int argc, char** argv)
   std::this_thread::sleep_for(std::chrono::seconds(2));
 
   driver_lora_chain_network::loraService srv;
-  srv.request.cmd = formSoftResetCommand();
+  srv.request.command = formSoftResetCommand();
 
 
   if (client.call(srv))

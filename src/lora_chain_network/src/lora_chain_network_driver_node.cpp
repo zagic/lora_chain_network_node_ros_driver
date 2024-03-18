@@ -7,7 +7,7 @@
 #include <thread>
 #include <algorithm> 
 #include <chrono>
-
+#include "std_msgs/String.h"
 serial::Serial ser_;
 
 

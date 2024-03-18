@@ -1,8 +1,8 @@
-#include "lora_msg_parser_generator.h"
-#include "driver_lora_chain_network/loraService.h"
+#include "../include/lora_msg_parser_generator.h"
 #include <sstream>
 #include <iomanip>
-
+#include <cstring>
+#include <algorithm> 
 
 std::string toHexString(const uint8_t* data, size_t length) {
     std::stringstream ss;
@@ -13,7 +13,7 @@ std::string toHexString(const uint8_t* data, size_t length) {
     return ss.str();
 }
 
-std::vector<uint8_t> fromHexString(const std::string& hexStr, size_t bytelen, size_t startPos = 0 ) {
+std::vector<uint8_t> fromHexString(const std::string& hexStr, size_t bytelen, size_t startPos) {
     std::vector<uint8_t> data;
 
     if (startPos >= hexStr.length() || startPos % 2 != 0) {
@@ -80,7 +80,8 @@ std::string formStatusCheckCommand() {
  * @return Generated command string
  */
 std::string formSendCommand(uint8_t * target, QosLevel qos, uint8_t * payload, int len) {
-    return AT_CMD_SEND + toHexString(target, DEVICE_ID_LEN) + ","+ toHexString(static_cast<uint8_t>(qos), 1)
+    uint8_t tmp = static_cast<uint8_t>(qos);
+    return lora_chain_network_const::AT_CMD_SEND + toHexString(target, DEVICE_ID_LEN) + ","+ toHexString(&tmp, 1)
     +",0,"+toHexString(payload, len)+"\r\n";
 }
 
@@ -89,7 +90,7 @@ std::string formSendCommand(uint8_t * target, QosLevel qos, uint8_t * payload, i
  * @return Generated command string
  */
 std::string formChanInfoCommand() {
-    return AT_CMD_CHANINFO+"=0\r\n";
+    return lora_chain_network_const::AT_CMD_CHANINFO+"=0\r\n";
 }
 
 
@@ -133,11 +134,12 @@ CommandResult_t parseCommandResult(int command, int res, std::string response){
         case 3:
             tr.cmd = LoraCommandType::SEND;
             if(response.find(lora_chain_network_const::AT_RESPONSE_STATUS) != std::string::npos){
+                std::istringstream iss(response);
                 std::string token,session_id;
                 if(std::getline(iss,token, ',')){
                     if(std::getline(iss,session_id, ',')){
                         std::vector<uint8_t> sesion_vector = fromHexString(session_id,2,0);
-                        if(sesion_vector.size==2){
+                        if((sesion_vector.size())==2){
                             tr.data.session_id = sesion_vector[0]+sesion_vector[1]*256;
                         }else{
                             tr.status = LoraReturnedStatus::RES_ERROR;
@@ -148,6 +150,9 @@ CommandResult_t parseCommandResult(int command, int res, std::string response){
             }
             return tr;
         case 4:
+        {
+
+        
             tr.cmd = LoraCommandType::CHAN_INFO;
             uint8_t num =0;
             if(response.find(lora_chain_network_const::AT_RESPONSE_RECEIVE) != std::string::npos){
@@ -168,11 +173,11 @@ CommandResult_t parseCommandResult(int command, int res, std::string response){
                                         }else{
                                             break;
                                         }
-                                        try(
+                                        try{
                                             tr.data.chanInfoList.list[num].idx = std::stoi(idx);
                                             tr.data.chanInfoList.list[num].rss = std::stoi(rss);
                                             tr.data.chanInfoList.list[num].snr = std::stoi(snr);
-                                        )catch(...){
+                                        }catch(...){
                                             break;
                                         }
                                         num++;
@@ -189,19 +194,20 @@ CommandResult_t parseCommandResult(int command, int res, std::string response){
             }
             tr.data.chanInfoList.len =num;
             return tr;
+        }
         case 5:
             tr.cmd = LoraCommandType::CHECK_STATUS;
-            if(response.find(AT_RESPONSE_STATUS) != std::string::npos){
-                if(response.find(AT_DEVICE_STATUS_IDLE) != std::string::npos){
-                    tr.data.node_status = LoraNodeStatus::IDLE;
-                }else if(response.find(AT_DEVICE_STATUS_TXRX) != std::string::npos){
-                    tr.data.node_status = LoraNodeStatus::TXRX;
-                }else if(response.find(AT_DEVICE_STATUS_SEARCHING) != std::string::npos){
-                    tr.data.node_status = LoraNodeStatus::SEARCHING;
-                }else if(response.find(AT_DEVICE_STATUS_BUZY) != std::string::npos){
-                    tr.data.node_status = LoraNodeStatus::BUZY;
+            if(response.find(lora_chain_network_const::AT_RESPONSE_STATUS) != std::string::npos){
+                if(response.find(lora_chain_network_const::AT_DEVICE_STATUS_IDLE) != std::string::npos){
+                    tr.data.node_status = LoraNodeStatus::NODE_IDLE;
+                }else if(response.find(lora_chain_network_const::AT_DEVICE_STATUS_TXRX) != std::string::npos){
+                    tr.data.node_status = LoraNodeStatus::NODE_TXRX;
+                }else if(response.find(lora_chain_network_const::AT_DEVICE_STATUS_SEARCHING) != std::string::npos){
+                    tr.data.node_status = LoraNodeStatus::NODE_SEARCHING;
+                }else if(response.find(lora_chain_network_const::AT_DEVICE_STATUS_BUZY) != std::string::npos){
+                    tr.data.node_status = LoraNodeStatus::NODE_BUZY;
                 }else{
-                    tr.data.node_status = LoraNodeStatus::UNKNOWN;
+                    tr.data.node_status = LoraNodeStatus::NODE_UNKNOWN;
                 }
             }
             return tr;
@@ -229,22 +235,22 @@ ReceivedMesssageObj_t parseReceivedMessage(std::string msg){
                       tr.Source[i] = id_vector[i];
                   }
               }else{
-                  ROS_WARN("Lora message parse failed");
+ //                 ROS_WARN("Lora message parse failed");
                   return tr;
               }
 
               std::vector<uint8_t> data_vector = fromHexString(data,data.size()/2,0);
               if(data_vector.size() ==data.size()/2){
-                tr.len = std::min(data_vector.size(),MAX_MESSAGE_PAYLOAD_LEN);
+                tr.len = std::min(data_vector.size(),static_cast<size_t>(MAX_MESSAGE_PAYLOAD_LEN));
                 memcpy(tr.payload,data_vector.data(),tr.len);
               }else{
-                ROS_WARN("Lora message parse failed");
+ //               ROS_WARN("Lora message parse failed");
                 return tr;
               }
 
               std::vector<uint8_t> qos_vector = fromHexString(qos,1,0);
               uint8_t qos_u8 =  qos_vector[0] & 0xF0;
-              tr.MessageType = static_cast<MessageType>(qos_u8);
+              tr.type = static_cast<MessageType>(qos_u8);
               return tr;
 
             }
@@ -252,6 +258,6 @@ ReceivedMesssageObj_t parseReceivedMessage(std::string msg){
         }
     }
   }
-  ROS_WARN("Lora message parse failed");
-  return;
+//  ROS_WARN("Lora message parse failed");
+  return tr;
 }
