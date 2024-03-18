@@ -1,0 +1,3 @@
+roslaunch driver_lora_chain_network lora_chain_network_driver.launch
+
+source devel/setup.bash

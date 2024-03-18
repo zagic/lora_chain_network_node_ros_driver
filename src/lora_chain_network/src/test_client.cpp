@@ -10,7 +10,7 @@
 
 void loraMessageCallback(const std_msgs::String::ConstPtr& msg){
     parseReceivedMessage(msg->data);
-    ROS_INFO("Receive msg: %s", msg->data.c_str());
+    ROS_WARN("Receive msg: %s", msg->data.c_str());
 }
 
 int main(int argc, char** argv)
@@ -35,14 +35,14 @@ int main(int argc, char** argv)
   driver_lora_chain_network::loraService srv;
   srv.request.command = formSoftResetCommand();
 
-
+  ROS_ERROR("send command\n");
   if (client.call(srv))
   {
-    ROS_INFO("OK");
+    ROS_WARN("OK");
   }
   else
   {
-    ROS_ERROR("Failed to call service add_two_ints");
+    ROS_ERROR("Failed to call service");
 
   }
 
