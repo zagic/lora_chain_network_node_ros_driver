@@ -59,8 +59,8 @@ struct ChanInfoList_t{
 };
 
 enum class MessageType{
-  DATA_TRAFFIC,
-  ACKNOWLEDGEMENT
+  DATA_TRAFFIC    =1<<4,
+  ACKNOWLEDGEMENT =5<<4
 };
 static constexpr int MAX_MESSAGE_PAYLOAD_LEN = 200;
 

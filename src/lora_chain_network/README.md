@@ -1,104 +1,29 @@
-[![Build Status](https://travis-ci.com/vortexntnu/stim300.svg?branch=master)](https://travis-ci.com/vortexntnu/stim300)
+# ROS1 driver for Lora chain network end-device
 
-# STIM 300
-https://www.sensonor.com/products/inertial-measurement-units/stim300/
+This project contains the ROS driver of the Lora chain network end-device.
 
-Run with:
+The end-device will be controlled by the "driver_lora_chain_network_node"
 
-    rosrun driver_stim300 stim300_driver_node
+It also comes with a sample node "lora_test_node" that allows the user to test the end-devcie and ineract with the end-devcie manually.
 
-or
+## Methodology
+The driver interact with the end-device via serial port, so you need to connect the end-device to the ROS host via a USB2TTL dongle. 
 
-    roslaunch driver_stim300 stim300_driver.launch
-    
-see launch file for available parameters.
+The driver will create a service and other ROS nodes can send command to the end-device via the service. It will also create a topic and post any received message to that topic. 
 
-## Communicate with STIM300 over terminal
-For testing and configuration during development it can be useful to comunicate with the STIM300 IMU directly over terminal.
-Here is a simple example for how to that using minicom.
+The USB port name, servcie name and topic name are configurable. (refer to: lora_chain_network_driver.launch)
 
-Install minicom:
+## Test the driver
 
-    sudo apt-get install minicom
+To test the driver, you need to start the ROS core and the driver_lora_chain_network_node
 
-Look for device:
+$rosrun driver_lora_chain_network driver_lora_chain_network_node
 
-    dmesg | grep tty
+The test node must not be started in .launch file so that the manual input can work.
 
-Open minicom with setings:
+$rosrun driver_lora_chain_network driver_lora_chain_network_node  
 
-    sudo minicom -s
+## More information
 
-Setup minicom for stim300:
+This driver only support unblock mode command of the end-devcie. Please refer to Lora chain network end device implementation_V_X_X.docx for more information about the end-device's behaviour.
 
-Serial port setup:
-
-    A - Serial Device: /dev/ttyUSB0
-    E - 921600 8N1
-    F - Disable hardware flow control
-
-Modem and dialing: (Clear option A...I)
-
-    A -
-    * -
-    * -
-    * -
-    I -
-
-Screen and keyboard:
-
-    P - Add linefeed
-
-Save setup as dfl then Exit minicom, and enter again in hex display mode:
-
-    sudo minicom -H
-
-The stim300 is in normal mode and will reapeatidly send the standard datagram.
-
-Enter service mode: write "SERVICEMODE" and press enter
-
-    SERVICEMODE
-
-Clear the screen:
-
-    Ctrl-A c
-
-If the incomming datagram feed stopped it means you enter service mode sucsessfully. While in service mode the stim 300 will comunicate with asci characters. Exit minicom and enter in normal ASCI mode:
-
-    Ctrl-A x
-    sudo minicom
-
-Write ? and press enter, and the STIM300 should send info about available commands
-
-    ?
-
-This will show a list on available commands including how to go back to normal mode. For example:
-
-    c
-
- will perform a system check.
- 
- ## Calibration 
- 
-The following commands are used to calibrate the stim300 driver with the ESKF (Error-state Kalman filter)
-
-First launch the stim300 driver
-
-```bash
-roslaunch driver_stim300 stim300_driver.launch
-```
-
-Then move to another terminal and do the following
-
-```bash
-rosservice call /IMU_calibration
-```
-
-Now head over to the stim300-driver.launch terminal window and take note of the roll and pitch alignment errors.
-
-Find the parameter list for the ESKF and put in the roll and pitch errors in the following parameters
-
-```bash
-sr_accelerometer_alignment 
-sr_gyro_alignment
-```

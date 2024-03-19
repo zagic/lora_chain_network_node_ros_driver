@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <cstring>
 #include <algorithm> 
+#include <iostream>
 
 std::string toHexString(const uint8_t* data, size_t length) {
     std::stringstream ss;
@@ -11,6 +12,14 @@ std::string toHexString(const uint8_t* data, size_t length) {
         ss << std::setw(2) << static_cast<int>(data[i]);
     }
     return ss.str();
+}
+
+bool is_hex_string_valid(const std::string& hexStr) {
+    if (hexStr.length() % 2 != 0) return false; // Length must be even
+    for (char c : hexStr) {
+        if (!std::isxdigit(c)) return false; // Must be a hex digit
+    }
+    return true;
 }
 
 std::vector<uint8_t> fromHexString(const std::string& hexStr, size_t bytelen, size_t startPos) {
@@ -27,11 +36,18 @@ std::vector<uint8_t> fromHexString(const std::string& hexStr, size_t bytelen, si
     }
     for (size_t i = startPos; i < endPoint; i += 2) {
         std::string byteString = hexStr.substr(i, 2);
+        if(!is_hex_string_valid(byteString )){
+            data.clear();
+            return data;
+        }
         uint8_t byte = static_cast<uint8_t>(std::strtol(byteString.c_str(), nullptr, 16));
         data.push_back(byte);
     }
     return data;
 }
+
+
+
 
 
 /**
@@ -41,7 +57,7 @@ std::vector<uint8_t> fromHexString(const std::string& hexStr, size_t bytelen, si
  * @return Generated command string
  */
 std::string formSetIDCommand(uint8_t * id) {
-  return lora_chain_network_const::AT_CMD_SET_ID + toHexString(id, DEVICE_ID_LEN) +",0000" +"\r\n";
+  return lora_chain_network_const::AT_CMD_SET_ID +"="+ toHexString(id, DEVICE_ID_LEN) +",0000" +"\r\n";
 }
 
 
@@ -111,13 +127,16 @@ CommandResult_t parseCommandResult(int command, int res, std::string response){
             tr.status = LoraReturnedStatus::RES_TIMEOUT;
             break;
         case 4:
-            tr.status = LoraReturnedStatus::RES_COMMAND_FORMAT_ERROR;
+            tr.status = LoraReturnedStatus::RES_UNKNOWN;
             break;
         case 5:
+            tr.status = LoraReturnedStatus::RES_COMMAND_FORMAT_ERROR;
+            break;
+        case 6:
             tr.status = LoraReturnedStatus::RES_UART_NO_RESPONSE;
             break;
         default:
-            tr.status = LoraReturnedStatus::RES_ERROR;
+            tr.status = LoraReturnedStatus::RES_UNKNOWN;
             break;
     }
 
@@ -137,57 +156,55 @@ CommandResult_t parseCommandResult(int command, int res, std::string response){
                 std::istringstream iss(response);
                 std::string token,session_id;
                 if(std::getline(iss,token, ',')){
-                    if(std::getline(iss,session_id, ',')){
-                        std::vector<uint8_t> sesion_vector = fromHexString(session_id,2,0);
-                        if((sesion_vector.size())==2){
-                            tr.data.session_id = sesion_vector[0]+sesion_vector[1]*256;
-                        }else{
-                            tr.status = LoraReturnedStatus::RES_ERROR;
+                    if(std::getline(iss,token, ',')){
+                        if(std::getline(iss,session_id, ',')){
+                            std::vector<uint8_t> sesion_vector = fromHexString(session_id,2,0);
+                            if((sesion_vector.size())==2){
+                                tr.data.session_id = sesion_vector[0]+sesion_vector[1]*256;
+                            }else{
+                                tr.status = LoraReturnedStatus::RES_ERROR;
+                            }
+                            
                         }
-                        
                     }
                 }
             }
             return tr;
         case 4:
-        {
-
-        
+        {       
             tr.cmd = LoraCommandType::CHAN_INFO;
             uint8_t num =0;
-            if(response.find(lora_chain_network_const::AT_RESPONSE_RECEIVE) != std::string::npos){
+            if(response.find(lora_chain_network_const::AT_RESPONSE_RES) != std::string::npos){
                 std::istringstream iss(response);
                 std::string token,id,idx,rss,snr;
-                
                 if(std::getline(iss, token, ' ')){   /*There is a space after +res= */
-                    while(true){
-                        if(std::getline(iss,id, ',')){
-                            if(std::getline(iss,idx, ',')){
-                                if(std::getline(iss,rss, ',')){
-                                    if(std::getline(iss,snr, ',')){
-                                        std::vector<uint8_t> id_vector = fromHexString(id,DEVICE_ID_LEN,0);
-                                        if(id_vector.size()==DEVICE_ID_LEN){
-                                            for(int i =0;i<DEVICE_ID_LEN;i++){
-                                                tr.data.chanInfoList.list[num].id[i] = id_vector[i];
-                                            }
-                                        }else{
-                                            break;
+                    while(std::getline(iss,id, ',')){
+                        if(std::getline(iss,idx, ',')){
+                            if(std::getline(iss,rss, ',')){
+                                if(std::getline(iss,snr, ',')){
+                                    std::vector<uint8_t> id_vector = fromHexString(id,DEVICE_ID_LEN,0);
+                                    if(id_vector.size()==DEVICE_ID_LEN){
+                                        for(int i =0;i<DEVICE_ID_LEN;i++){
+                                            tr.data.chanInfoList.list[num].id[i] = id_vector[i];
                                         }
-                                        try{
-                                            tr.data.chanInfoList.list[num].idx = std::stoi(idx);
-                                            tr.data.chanInfoList.list[num].rss = std::stoi(rss);
-                                            tr.data.chanInfoList.list[num].snr = std::stoi(snr);
-                                        }catch(...){
-                                            break;
-                                        }
-                                        num++;
-                                        
+                                    }else{
+                                        break;
                                     }
+                                    try{
+                                        tr.data.chanInfoList.list[num].idx = std::stoi(idx);
+                                        tr.data.chanInfoList.list[num].rss = std::stoi(rss);
+                                        tr.data.chanInfoList.list[num].snr = std::stoi(snr);
+                                    }catch(...){
+                                        break;
+                                    }
+                                    num++;
+                                    
                                 }
                             }
                         }
-
                     }
+
+                    
                 }
                 
 

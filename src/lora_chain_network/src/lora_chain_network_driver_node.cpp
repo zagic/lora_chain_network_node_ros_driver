@@ -34,7 +34,6 @@ constexpr int SERIAL_BAUDRATE =115200;
 std::mutex mtx;
 std::condition_variable cv;
 
-
 LoraReturnedStatus waitRes(int res_num,int expire_time);
 void broadcastToTopic(const std::string& msg);
 
@@ -42,7 +41,7 @@ void emptyRxBuffer(){
   std::string line;
   while(ser_.available()){
     line = ser_.readline(100+ MAX_MESSAGE_PAYLOAD_LEN*2, "\n");
-    ROS_WARN("UART received: %s", line.c_str());
+    ROS_INFO("UART received: %s", line.c_str());
   }
 }
 
@@ -59,7 +58,7 @@ bool handle_service_request(driver_lora_chain_network::loraService::Request &req
       return true;
     }
     
-    ROS_WARN("Request received: %s", req.command.c_str());
+    ROS_INFO("Request received: %s", req.command.c_str());
     commandTosend = req.command;
     //taskTX = taskStatus::SENDING;
 
@@ -80,7 +79,7 @@ bool handle_service_request(driver_lora_chain_network::loraService::Request &req
     }else if(commandTosend.find(lora_chain_network_const::AT_CMD_SEND) != std::string::npos){
       commandType = static_cast<int>(LoraCommandType::SEND);
       sendCommnad(commandTosend);
-      waitRes(2,1); //need two +RES_OK and ack maybe
+      waitRes(2,2); //need two +RES_OK and ack maybe
     }else if(commandTosend.find(lora_chain_network_const::AT_CMD_CHANINFO) != std::string::npos){
       commandType = static_cast<int>(LoraCommandType::CHAN_INFO);
       sendCommnad(commandTosend);
@@ -93,11 +92,10 @@ bool handle_service_request(driver_lora_chain_network::loraService::Request &req
       commandType = static_cast<int>(LoraCommandType::UNKNOWN);
     }
       
-
+    
     res.result = commandResult; 
     res.commandtype = commandType; 
     res.response_message = returnedInfo;
-    
     return true;
 }
 
@@ -110,7 +108,7 @@ void broadcastToTopic(const std::string& msg) {
 void readOneLine(){
   std::string line;
   line = ser_.readline(100+ MAX_MESSAGE_PAYLOAD_LEN*2, "\n");
-  ROS_WARN("UART received: %s", line.c_str());
+  ROS_INFO("UART received: %s", line.c_str());
   if(line.find(lora_chain_network_const::AT_RESPONSE_RECEIVE) != std::string::npos){
       broadcastToTopic(line);
   }else{
@@ -131,7 +129,7 @@ LoraReturnedStatus waitRes(int res_num,int expire_time){
       if(ser_.available()){
         
         line = ser_.readline(100+ MAX_MESSAGE_PAYLOAD_LEN*2, "\n");
-        ROS_WARN("UART received: %s", line.c_str());
+        ROS_INFO("UART received: %s", line.c_str());
         if(line.find(lora_chain_network_const::AT_RESPONSE_RES) != std::string::npos){
           if(line.find(lora_chain_network_const::AT_RETURN_RES_OK) != std::string::npos){
             num_counter++;
@@ -139,6 +137,9 @@ LoraReturnedStatus waitRes(int res_num,int expire_time){
               commandResult = static_cast<int>(LoraReturnedStatus::RES_OK);
               return LoraReturnedStatus::RES_OK;
             }
+          }else if(line.find(lora_chain_network_const::AT_RETURN_RES_FORMAT_ERR) != std::string::npos){  //"FORMAT_ERROR" check needs to be ahead to "ERROR" check
+              commandResult = static_cast<int>(LoraReturnedStatus::RES_COMMAND_FORMAT_ERROR);
+              return LoraReturnedStatus::RES_COMMAND_FORMAT_ERROR;
           }else if(line.find(lora_chain_network_const::AT_RETURN_RES_BUZY) != std::string::npos){
               commandResult = static_cast<int>(LoraReturnedStatus::RES_BUZY);
               return LoraReturnedStatus::RES_BUZY;
@@ -148,9 +149,6 @@ LoraReturnedStatus waitRes(int res_num,int expire_time){
           }else if(line.find(lora_chain_network_const::AT_RETURN_RES_TIMEOUT) != std::string::npos){
               commandResult = static_cast<int>(LoraReturnedStatus::RES_TIMEOUT);
               return LoraReturnedStatus::RES_TIMEOUT;
-          }else if(line.find(lora_chain_network_const::AT_RETURN_RES_FORMAT_ERR) != std::string::npos){
-              commandResult = static_cast<int>(LoraReturnedStatus::RES_COMMAND_FORMAT_ERROR);
-              return LoraReturnedStatus::RES_COMMAND_FORMAT_ERROR;
           }else if(line.find(",") != std::string::npos){
               returnedInfo =line;
               num_counter++;
@@ -176,6 +174,8 @@ LoraReturnedStatus waitRes(int res_num,int expire_time){
       }
 
   }
+  commandResult = static_cast<int>(LoraReturnedStatus::RES_TIMEOUT);
+  return LoraReturnedStatus::RES_TIMEOUT;
 }
 
 int main(int argc, char** argv)
@@ -206,56 +206,25 @@ int main(int argc, char** argv)
       ser_.setTimeout(to);
       ser_.open();
 
-      ROS_WARN("serial started\n");
+      ROS_INFO("serial started");
   }
   catch (serial::IOException& e){
       ROS_ERROR_STREAM("Unable to open port ");
       return -1;
   }catch (std::runtime_error &error) {
     // TODO: Reset IMU
-    ROS_ERROR("%s\n", error.what());
+    ROS_ERROR("%s", error.what());
     return 0;
   }
 
   while (ros::ok())
   {
     ros::spinOnce();
-    // if(taskTX == taskStatus::SENDING){
-    //   if(commandTosend.find(lora_chain_network_const::AT_CMD_RESET) != std::string::npos){
-    //     commandType = static_cast<int>(LoraCommandType::RESET);
-    //     sendCommnad(commandTosend);
-    //     waitRes(1,1);
-    //   }else if(commandTosend.find(lora_chain_network_const::AT_CMD_JOIN) != std::string::npos){
-    //     commandType = static_cast<int>(LoraCommandType::JOIN);
-    //     sendCommnad(commandTosend);
-    //     waitRes(1,1);
-    //   }else if(commandTosend.find(lora_chain_network_const::AT_CMD_STATUS) != std::string::npos){
-    //     commandType = static_cast<int>(LoraCommandType::CHECK_STATUS);
-    //     sendCommnad(commandTosend);
-    //     waitRes(1,1);
-    //   }else if(commandTosend.find(lora_chain_network_const::AT_CMD_SEND) != std::string::npos){
-    //     commandType = static_cast<int>(LoraCommandType::SEND);
-    //     sendCommnad(commandTosend);
-    //     waitRes(2,1); //need two +RES_OK and ack maybe
-    //   }else if(commandTosend.find(lora_chain_network_const::AT_CMD_CHANINFO) != std::string::npos){
-    //     commandType = static_cast<int>(LoraCommandType::CHAN_INFO);
-    //     sendCommnad(commandTosend);
-    //     waitRes(3,1);  //need two +RES_OK and the chan info
-    //   }else if(commandTosend.find(lora_chain_network_const::AT_CMD_SET_ID) != std::string::npos){
-    //     commandType = static_cast<int>(LoraCommandType::SET_ID);
-    //     sendCommnad(commandTosend);
-    //     waitRes(2,1); //need two +RES_OK
-    //   }else{
-    //     commandType = static_cast<int>(LoraCommandType::UNKNOWN);
-    //   }
-    //   taskTX = taskStatus::RETURNING;
-    //   cv.notify_one(); 
-    // }
     
     if(ser_.available()){
       readOneLine();
     }
-    //ROS_WARN("here3");
+    //ROS_INFO("here3");
   }
   return 0;
   
