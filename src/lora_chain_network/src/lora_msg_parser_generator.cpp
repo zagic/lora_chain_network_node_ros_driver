@@ -16,7 +16,7 @@ std::string toHexString(const uint8_t* data, size_t length) {
 std::vector<uint8_t> fromHexString(const std::string& hexStr, size_t bytelen, size_t startPos) {
     std::vector<uint8_t> data;
 
-    if (startPos >= hexStr.length() || startPos % 2 != 0) {
+    if (startPos >= hexStr.length() ) {
         return data; 
     }
     size_t endPoint;
@@ -81,8 +81,8 @@ std::string formStatusCheckCommand() {
  */
 std::string formSendCommand(uint8_t * target, QosLevel qos, uint8_t * payload, int len) {
     uint8_t tmp = static_cast<uint8_t>(qos);
-    return lora_chain_network_const::AT_CMD_SEND + toHexString(target, DEVICE_ID_LEN) + ","+ toHexString(&tmp, 1)
-    +",0,"+toHexString(payload, len)+"\r\n";
+    return lora_chain_network_const::AT_CMD_SEND +"="+ toHexString(target, DEVICE_ID_LEN) 
+    +",0,"+toHexString(payload, len)+ ","+ toHexString(&tmp, 1)+"\r\n";
 }
 
 /**

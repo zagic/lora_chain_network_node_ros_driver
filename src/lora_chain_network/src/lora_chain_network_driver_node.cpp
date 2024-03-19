@@ -65,37 +65,33 @@ bool handle_service_request(driver_lora_chain_network::loraService::Request &req
 
    // cv.wait(lck, []{return taskTX == taskStatus::RETURNING;});
 
-      if(commandTosend.find(lora_chain_network_const::AT_CMD_RESET) != std::string::npos){
-        commandType = static_cast<int>(LoraCommandType::RESET);
-        sendCommnad(commandTosend);
-        waitRes(1,1);
-      }else if(commandTosend.find(lora_chain_network_const::AT_CMD_JOIN) != std::string::npos){
-        commandType = static_cast<int>(LoraCommandType::JOIN);
-        sendCommnad(commandTosend);
-        waitRes(1,1);
-      }else if(commandTosend.find(lora_chain_network_const::AT_CMD_STATUS) != std::string::npos){
-        commandType = static_cast<int>(LoraCommandType::CHECK_STATUS);
-        sendCommnad(commandTosend);
-        waitRes(1,1);
-      }else if(commandTosend.find(lora_chain_network_const::AT_CMD_SEND) != std::string::npos){
-        commandType = static_cast<int>(LoraCommandType::SEND);
-        sendCommnad(commandTosend);
-        waitRes(2,1); //need two +RES_OK and ack maybe
-      }else if(commandTosend.find(lora_chain_network_const::AT_CMD_CHANINFO) != std::string::npos){
-        commandType = static_cast<int>(LoraCommandType::CHAN_INFO);
-        sendCommnad(commandTosend);
-        waitRes(3,1);  //need two +RES_OK and the chan info
-      }else if(commandTosend.find(lora_chain_network_const::AT_CMD_SET_ID) != std::string::npos){
-        commandType = static_cast<int>(LoraCommandType::SET_ID);
-        sendCommnad(commandTosend);
-        waitRes(2,1); //need two +RES_OK
-      }else{
-        commandType = static_cast<int>(LoraCommandType::UNKNOWN);
-      }
-      std::string line ="test";
-      broadcastToTopic(line);
-      line ="test2";
-      broadcastToTopic(line);
+    if(commandTosend.find(lora_chain_network_const::AT_CMD_RESET) != std::string::npos){
+      commandType = static_cast<int>(LoraCommandType::RESET);
+      sendCommnad(commandTosend);
+      waitRes(1,1);
+    }else if(commandTosend.find(lora_chain_network_const::AT_CMD_JOIN) != std::string::npos){
+      commandType = static_cast<int>(LoraCommandType::JOIN);
+      sendCommnad(commandTosend);
+      waitRes(1,1);
+    }else if(commandTosend.find(lora_chain_network_const::AT_CMD_STATUS) != std::string::npos){
+      commandType = static_cast<int>(LoraCommandType::CHECK_STATUS);
+      sendCommnad(commandTosend);
+      waitRes(1,1);
+    }else if(commandTosend.find(lora_chain_network_const::AT_CMD_SEND) != std::string::npos){
+      commandType = static_cast<int>(LoraCommandType::SEND);
+      sendCommnad(commandTosend);
+      waitRes(2,1); //need two +RES_OK and ack maybe
+    }else if(commandTosend.find(lora_chain_network_const::AT_CMD_CHANINFO) != std::string::npos){
+      commandType = static_cast<int>(LoraCommandType::CHAN_INFO);
+      sendCommnad(commandTosend);
+      waitRes(3,1);  //need two +RES_OK and the chan info
+    }else if(commandTosend.find(lora_chain_network_const::AT_CMD_SET_ID) != std::string::npos){
+      commandType = static_cast<int>(LoraCommandType::SET_ID);
+      sendCommnad(commandTosend);
+      waitRes(2,1); //need two +RES_OK
+    }else{
+      commandType = static_cast<int>(LoraCommandType::UNKNOWN);
+    }
       
 
     res.result = commandResult; 
@@ -203,14 +199,14 @@ int main(int argc, char** argv)
 
 
   try{
-      // 打开串口
+      // open serial port
       ser_.setPort(device_name);
       ser_.setBaudrate(SERIAL_BAUDRATE);
       serial::Timeout to = serial::Timeout::simpleTimeout(1000);
       ser_.setTimeout(to);
       ser_.open();
 
-      ROS_ERROR("serial started\n");
+      ROS_WARN("serial started\n");
   }
   catch (serial::IOException& e){
       ROS_ERROR_STREAM("Unable to open port ");
@@ -225,7 +221,6 @@ int main(int argc, char** argv)
   {
     ros::spinOnce();
     // if(taskTX == taskStatus::SENDING){
-    //   ROS_WARN("here1");
     //   if(commandTosend.find(lora_chain_network_const::AT_CMD_RESET) != std::string::npos){
     //     commandType = static_cast<int>(LoraCommandType::RESET);
     //     sendCommnad(commandTosend);
@@ -258,7 +253,6 @@ int main(int argc, char** argv)
     // }
     
     if(ser_.available()){
-      ROS_WARN("here2");
       readOneLine();
     }
     //ROS_WARN("here3");
