@@ -1,0 +1,7 @@
+<launch>
+  <node name="driver_lora_chain_network_node" pkg="driver_lora_chain_network" type="driver_lora_chain_network_node" />
+  <!-- <node name="lora_test_node" pkg="driver_lora_chain_network" type="lora_test_node" />
+  <param name = "device_name" value="/dev/ttyUSB0" type="string" />
+  <param name = "service_name" value="/lora/service" type="string" />
+  <param name = "topic_name" value="/lora/receive" type="string" /> -->
+</launch>

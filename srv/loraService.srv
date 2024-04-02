@@ -1,0 +1,5 @@
+string command
+---
+int32 commandtype
+int32 result
+string response_message

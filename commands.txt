@@ -1,0 +1,10 @@
+Command copy paste board:
+
+roslaunch driver_lora_chain_network lora_chain_network_driver.launch
+
+source devel/setup.bash
+
+rosrun driver_lora_chain_network lora_test_node
+
+rosrun driver_lora_chain_network driver_lora_chain_network_node
+
