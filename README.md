@@ -21,13 +21,21 @@ $sudo apt-get install ros-noetic-serial
 
 Only ROS1 noetic was varified. However, it may also work with melodic or kinetic.
 
-To test the driver, you need to start the ROS core and the driver_lora_chain_network_node
+To test the driver, you need to build the project with 
 
-$rosrun driver_lora_chain_network driver_lora_chain_network_node
+'''$catkin_make'''
+
+and run
+
+'''$source devel/setup.bash'''
+
+Then, you can start the ROS core and the driver_lora_chain_network_node
+
+'''$rosrun driver_lora_chain_network driver_lora_chain_network_node'''
 
 The test node must not be started in .launch file so that the manual input can work.
 
-$rosrun driver_lora_chain_network lora_test_node  
+'''$rosrun driver_lora_chain_network lora_test_node'''
 
 ## More information
 
