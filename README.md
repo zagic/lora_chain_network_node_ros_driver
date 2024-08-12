@@ -19,6 +19,8 @@ You may need to install ROS serial driver first:
 
 $sudo apt-get install ros-noetic-serial
 
+Only ROS1 noetic was varified. However, it may also work with melodic or kinetic.
+
 To test the driver, you need to start the ROS core and the driver_lora_chain_network_node
 
 $rosrun driver_lora_chain_network driver_lora_chain_network_node
@@ -31,3 +33,4 @@ $rosrun driver_lora_chain_network lora_test_node
 
 This driver only support unblock mode command of the end-devcie. Please refer to Lora chain network end device implementation_V_X_X.docx for more information about the end-device's behaviour.
 
+For any Lora end-devcie with firmware V1_2_0 or later. The device would connect to repeater automatically. The user does not need to command the devcie to connect a repeater.
