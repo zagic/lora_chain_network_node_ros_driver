@@ -41,4 +41,4 @@ The test node must not be started in .launch file so that the manual input can w
 
 This driver only support unblock mode command of the end-devcie. Please refer to Lora chain network end device implementation_V_X_X.docx for more information about the end-device's behaviour.
 
-For any Lora end-devcie with firmware V1_2_0 or later. The device would connect to repeater automatically. The user does not need to command the devcie to connect a repeater.
+For any Lora end-devcie with firmware V1_2_0 or later. The device would connect to repeater automatically. The user does not need to command the devcie to connect a repeater. The node will automatically search and join a repeater. The node drvier will also report the event of joining a repeater or lost of connection. 

@@ -67,7 +67,7 @@ int main(int argc, char** argv)
 
 
   std::string input;
-  std::string instruction = "Support tests: \n Type \"0,XXXX\"             set ID\n Type \"1\"                  join\n Type \"2\"                  reset\n Type \"3,XXXX,q,AABBCCDDD\" send hex data in bytes with q(qos) = 0 or 2 or 4 or6 \n Type \"4\"                  request chan_info\n Type \"5\"                  check status\n Type \"6\"                  rejoin\n" Type \"7\"                  quit network\n;
+  std::string instruction = "Support tests: \n Type \"0,XXXX\"             set ID\n Type \"1\"                  join\n Type \"2\"                  reset\n Type \"3,XXXX,q,AABBCCDDD\" send hex data in bytes with q(qos) = 0 or 2 or 4 or6 \n Type \"4\"                  request chan_info\n Type \"5\"                  check status\n Type \"6\"                  rejoin\n Type \"7\"                  quit network\n";
 
   LoraCommandType cmd_type;
   CommandResult_t result_object;
