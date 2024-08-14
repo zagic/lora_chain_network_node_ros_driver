@@ -88,6 +88,14 @@ bool handle_service_request(driver_lora_chain_network::loraService::Request &req
       commandType = static_cast<int>(LoraCommandType::SET_ID);
       sendCommnad(commandTosend);
       waitRes(2,1); //need two +RES_OK
+    }else if(commandTosend.find(lora_chain_network_const::AT_CMD_REJOIN) != std::string::npos){
+      commandType = static_cast<int>(LoraCommandType::REJOIN);
+      sendCommnad(commandTosend);
+      waitRes(2,1); //need two +RES_OK
+    }else if(commandTosend.find(lora_chain_network_const::AT_CMD_QUIT) != std::string::npos){
+      commandType = static_cast<int>(LoraCommandType::QUIT);
+      sendCommnad(commandTosend);
+      waitRes(2,1); //need two +RES_OK
     }else{
       commandType = static_cast<int>(LoraCommandType::UNKNOWN);
     }
@@ -110,6 +118,8 @@ void readOneLine(){
   line = ser_.readline(100+ MAX_MESSAGE_PAYLOAD_LEN*2, "\n");
   ROS_INFO("UART received: %s", line.c_str());
   if(line.find(lora_chain_network_const::AT_RESPONSE_RECEIVE) != std::string::npos){
+      broadcastToTopic(line);
+  }elseif(line.find(lora_chain_network_const::AT_RESPONSE_EVENT) != std::string::npos){
       broadcastToTopic(line);
   }else{
 

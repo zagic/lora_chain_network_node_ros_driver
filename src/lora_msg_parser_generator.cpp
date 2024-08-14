@@ -109,6 +109,13 @@ std::string formChanInfoCommand() {
     return lora_chain_network_const::AT_CMD_CHANINFO+"=0\r\n";
 }
 
+std::string formRejoinCommand(){
+    return lora_chain_network_const::AT_CMD_REJOIN+"\r\n";
+}
+std::string formQuitCommand(){
+    return lora_chain_network_const::AT_CMD_QUIT+"\r\n";
+}
+
 
 CommandResult_t parseCommandResult(int command, int res, std::string response){
 

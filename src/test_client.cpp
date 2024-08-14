@@ -15,15 +15,24 @@
 #include <array>
 
 void loraMessageCallback(const std_msgs::String::ConstPtr& msg){
-    ReceivedMesssageObj_t obj = parseReceivedMessage(msg->data);
-    if(obj.type == MessageType::DATA_TRAFFIC ){
-      std::string data = toHexString(obj.payload, obj.len);
-      ROS_INFO("Receive msg: %s from %02X%02X", data.c_str(), obj.Source[0], obj.Source[1] );
-    }else if(obj.type == MessageType::ACKNOWLEDGEMENT){
-      int session_id = obj.payload[0] + obj.payload[1]*256;
-      ROS_INFO("Receive ACK: %d from %02X%02X", session_id ,obj.Source[0], obj.Source[1] );
-    }else{
-      ROS_INFO("Receive unrecognized msg: %s" , msg->data.c_str());
+    if(msg->data.find(lora_chain_network_const::AT_RESPONSE_RECEIVE) != std::string::npos){
+      ReceivedMesssageObj_t obj = parseReceivedMessage(msg->data);
+      if(obj.type == MessageType::DATA_TRAFFIC ){
+        std::string data = toHexString(obj.payload, obj.len);
+        ROS_INFO("Receive msg: %s from %02X%02X", data.c_str(), obj.Source[0], obj.Source[1] );
+      }else if(obj.type == MessageType::ACKNOWLEDGEMENT){
+        int session_id = obj.payload[0] + obj.payload[1]*256;
+        ROS_INFO("Receive ACK: %d from %02X%02X", session_id ,obj.Source[0], obj.Source[1] );
+      }else{
+        ROS_INFO("Receive unrecognized msg: %s" , msg->data.c_str());
+      }
+    
+    }else if(msg->data.find(lora_chain_network_const::AT_RESPONSE_EVENT) != std::string::npos){
+      if(msg->data.find(lora_chain_network_const::AT_EVENT_DISCONNECT) != std::string::npos){
+        ROS_INFO("REPEATER disconnected" );
+      }else if(msg->data.find(lora_chain_network_const::AT_EVENT_CONNECTED) != std::string::npos){
+        ROS_INFO("REPEATER connected" );
+      }
     }
     
 }
@@ -58,7 +67,7 @@ int main(int argc, char** argv)
 
 
   std::string input;
-  std::string instruction = "Support tests: \n Type \"0,XXXX\"             set ID\n Type \"1\"                  join\n Type \"2\"                  reset\n Type \"3,XXXX,q,AABBCCDDD\" send hex data in bytes with q(qos) = 0 or 2 or 4 or6 \n Type \"4\"                  request chan_info\n Type \"5\"                  check status\n";
+  std::string instruction = "Support tests: \n Type \"0,XXXX\"             set ID\n Type \"1\"                  join\n Type \"2\"                  reset\n Type \"3,XXXX,q,AABBCCDDD\" send hex data in bytes with q(qos) = 0 or 2 or 4 or6 \n Type \"4\"                  request chan_info\n Type \"5\"                  check status\n Type \"6\"                  rejoin\n" Type \"7\"                  quit network\n;
 
   LoraCommandType cmd_type;
   CommandResult_t result_object;
@@ -231,6 +240,36 @@ int main(int argc, char** argv)
                   }
                 }else{
                   ROS_INFO("Status check failed");
+                }
+              }
+              else
+              {
+                ROS_ERROR("Failed to call service");
+              }
+            break;
+            case LoraCommandType::REJOIN:
+              srv.request.command = formRejoinCommand();
+              if (client.call(srv))
+              {
+                if(static_cast<LoraReturnedStatus>(srv.response.result) ==LoraReturnedStatus::RES_OK){
+                  ROS_INFO("Start to Rejoin");
+                }else{
+                  ROS_INFO("Rejoin failed");
+                }
+              }
+              else
+              {
+                ROS_ERROR("Failed to call service");
+              }
+            break;
+            case LoraCommandType::QUIT:
+              srv.request.command = formQuitCommand();
+              if (client.call(srv))
+              {
+                if(static_cast<LoraReturnedStatus>(srv.response.result) ==LoraReturnedStatus::RES_OK){
+                  ROS_INFO("Start to Quit");
+                }else{
+                  ROS_INFO("Quit failed");
                 }
               }
               else

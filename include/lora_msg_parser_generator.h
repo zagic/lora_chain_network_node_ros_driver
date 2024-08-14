@@ -12,6 +12,8 @@ enum class LoraCommandType {
     SEND,
     CHAN_INFO,
     CHECK_STATUS,
+    REJOIN,
+    QUIT,
     UNKNOWN
 
 };
@@ -87,6 +89,8 @@ std::string formJoinCommand() ;
 std::string formStatusCheckCommand() ;
 std::string formSendCommand(uint8_t * target, QosLevel qos, uint8_t * payload, int len) ;
 std::string formChanInfoCommand() ;
+std::string formRejoinCommand() ;
+std::string formQuitCommand() ;
 
 CommandResult_t parseCommandResult(int command, int res, std::string response);
 ReceivedMesssageObj_t parseReceivedMessage(std::string msg);
